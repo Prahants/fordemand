@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from backend.db.database import engine, Base, get_db
 from backend.db.models import Product, Sales, Inventory, Store, Supplier, User
 from backend.db.migrations import ensure_sqlite_schema
-from backend.routes import products, inventory, sales, forecast, alerts, master_data, forecast_logs
+from backend.routes import products, inventory, sales, forecast, alerts, master_data, forecast_logs, qr_codes
 from backend.services.auth import require_role
 
 
@@ -54,6 +54,7 @@ app.include_router(forecast.router)
 app.include_router(alerts.router)
 app.include_router(master_data.router)
 app.include_router(forecast_logs.router)
+app.include_router(qr_codes.router)
 
 
 @app.get("/", tags=["Health"])

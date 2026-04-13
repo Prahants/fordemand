@@ -17,4 +17,5 @@ dependencies = [
     "streamlit-webrtc>=0.64.5",
     "opencv-python>=4.13.0.92",
     "av>=16.1.0",
+    "qrcode[pil]>=8.2",
 ]

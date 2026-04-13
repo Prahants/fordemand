@@ -179,3 +179,16 @@ class ForecastLog(Base):
     actual_demand = Column(Float, nullable=True)
     variance = Column(Float, nullable=True)
     generated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class QRCodeEntry(Base):
+    """Stores generated QR payloads for product labeling/auditing."""
+    __tablename__ = "qr_codes"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    product = Column(String, nullable=False)
+    sku = Column(String, nullable=False, index=True)
+    category = Column(String, nullable=False)
+    price = Column(Float, nullable=False)
+    qr_payload = Column(String, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

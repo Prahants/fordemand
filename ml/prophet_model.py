@@ -29,7 +29,7 @@ def forecast_demand(dataframe: pd.DataFrame, periods: int = 7) -> dict:
     Returns:
         dict with keys:
             - 'forecasts': DataFrame with predicted values
-            - 'method': 'prophet' or 'moving_average'
+            - 'method': 'prophet' or 'average'
             - 'model': fitted Prophet model (None if fallback used)
     """
 
@@ -45,8 +45,8 @@ def forecast_demand(dataframe: pd.DataFrame, periods: int = 7) -> dict:
     df["quantity_sold"] = df["quantity_sold"].ffill().fillna(0)
 
     # ─── Step 2: Fallback Logic ───────────────────────────────────
-    # Use moving average if we have fewer than 5 data points
-    if len(df) < 5:
+    # Prophet needs at least 2 rows; use fallback only for truly minimal data
+    if len(df) < 2:
         return _moving_average_fallback(df, periods)
 
     # ─── Step 3: Convert to Prophet Format ────────────────────────
@@ -84,29 +84,40 @@ def forecast_demand(dataframe: pd.DataFrame, periods: int = 7) -> dict:
 
 def _moving_average_fallback(df: pd.DataFrame, periods: int) -> dict:
     """
-    Fallback forecasting method using simple moving average.
-    Used when there are fewer than 5 data points (not enough for Prophet).
+    Fallback forecasting method with trend extrapolation.
+    Used when there is only 1 data point (not enough for Prophet).
 
-    Args:
-        df: DataFrame with columns ['date', 'quantity_sold']
-        periods: Number of future days to forecast
-
-    Returns:
-        dict with forecast results using moving average method
+    If at least 2 points exist, a simple linear trend is extrapolated.
+    Otherwise, a flat average is used.
     """
-    # Calculate the average of all available data points
     avg_demand = df["quantity_sold"].mean()
-
-    # Generate future dates
     last_date = df["date"].max()
     future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=periods)
 
-    future_forecast = pd.DataFrame({
-        "date": future_dates,
-        "predicted_value": [round(avg_demand, 2)] * periods,
-        "yhat_lower": [round(avg_demand * 0.8, 2)] * periods,
-        "yhat_upper": [round(avg_demand * 1.2, 2)] * periods,
-    })
+    if len(df) >= 2:
+        x = np.arange(len(df), dtype=float)
+        y = df["quantity_sold"].values.astype(float)
+        slope, intercept = np.polyfit(x, y, 1)
+        std_dev = max(float(np.std(y)), 1.0)
+
+        predictions = []
+        for i in range(periods):
+            pred = intercept + slope * (len(df) + i)
+            predictions.append(round(max(pred, 0), 2))
+
+        future_forecast = pd.DataFrame({
+            "date": future_dates,
+            "predicted_value": predictions,
+            "yhat_lower": [round(max(p - 1.5 * std_dev, 0), 2) for p in predictions],
+            "yhat_upper": [round(p + 1.5 * std_dev, 2) for p in predictions],
+        })
+    else:
+        future_forecast = pd.DataFrame({
+            "date": future_dates,
+            "predicted_value": [round(avg_demand, 2)] * periods,
+            "yhat_lower": [round(avg_demand * 0.8, 2)] * periods,
+            "yhat_upper": [round(avg_demand * 1.2, 2)] * periods,
+        })
 
     return {
         "forecasts": future_forecast,

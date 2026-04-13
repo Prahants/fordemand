@@ -173,3 +173,23 @@ class ForecastLogResponse(BaseModel):
     generated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class QRCodeCreate(BaseModel):
+    product: str
+    sku: str
+    category: str
+    price: float
+    qr_payload: str
+
+
+class QRCodeResponse(BaseModel):
+    id: int
+    product: str
+    sku: str
+    category: str
+    price: float
+    qr_payload: str
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}

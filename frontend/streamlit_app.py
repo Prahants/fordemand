@@ -19,6 +19,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import date, timedelta
+import io
+import json
+import qrcode  # pyright: ignore[reportMissingModuleSource]
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 import cv2
 import av
@@ -108,9 +111,9 @@ def _auth_headers() -> dict:
     return {"X-Role": role}
 
 ROLE_PAGES = {
-    "admin": ["Dashboard", "Products", "Inventory", "Sales Entry", "Forecast", "QR Scanner", "Alerts"],
-    "manager": ["Dashboard", "Products", "Inventory", "Sales Entry", "Forecast", "QR Scanner", "Alerts"],
-    "staff": ["Dashboard", "Inventory", "Sales Entry", "Forecast", "QR Scanner", "Alerts"],
+    "admin": ["Dashboard", "Products", "Inventory", "Sales Entry", "Forecast", "QR Generator", "Alerts"],
+    "manager": ["Dashboard", "Products", "Inventory", "Sales Entry", "Forecast", "QR Generator", "Alerts"],
+    "staff": ["Dashboard", "Inventory", "Sales Entry", "Forecast", "QR Generator", "Alerts"],
 }
 
 
@@ -206,6 +209,8 @@ def create_plotly_theme():
 
 # ─── Sidebar Navigation ──────────────────────────────────────────
 with st.sidebar:
+    st.markdown("## 📦 Inventory System")
+    st.markdown("---")
     if "active_role" not in st.session_state:
         st.session_state.active_role = "manager"
     st.session_state.active_role = st.selectbox(
@@ -221,9 +226,9 @@ with st.sidebar:
     selected_store_name = st.selectbox("Store", options=list(store_options.keys()))
     st.session_state.active_store_id = store_options[selected_store_name]
 
-    st.markdown("---")
+   
 
-    st.markdown("## 📦 Inventory System")
+    
     st.markdown("---")
 
     allowed_pages = ROLE_PAGES.get(st.session_state.active_role, ROLE_PAGES["staff"])
@@ -342,8 +347,9 @@ elif page == "Products":
     st.markdown("Manage your product catalog.")
     st.markdown("---")
 
-    # Add new product form
-    with st.expander("➕ Add New Product", expanded=False):
+    add_tab, scan_tab = st.tabs(["➕ Add Product", "📷 Scan QR to Add"])
+
+    with add_tab:
         col1, col2 = st.columns(2)
         with col1:
             prod_name = st.text_input("Product Name", placeholder="e.g. Name of the product")
@@ -358,7 +364,7 @@ elif page == "Products":
             supplier_options.update({s["name"]: s["id"] for s in suppliers})
             supplier_name = st.selectbox("Supplier", list(supplier_options.keys()))
 
-        if st.button("✅ Create Product", use_container_width=True):
+        if st.button("Add Product", use_container_width=True):
             if prod_name:
                 result = api_post(
                     "/products/",
@@ -375,10 +381,144 @@ elif page == "Products":
             else:
                 st.warning("Please enter a product name.")
 
+    with scan_tab:
+        st.markdown("Scan a product QR code to **instantly add** it to your catalog and inventory.")
+
+        if "scan_added_product" not in st.session_state:
+            st.session_state.scan_added_product = None
+        if "scan_last_processed" not in st.session_state:
+            st.session_state.scan_last_processed = None
+
+        ctx = webrtc_streamer(
+            key="qr-scanner-products",
+            video_processor_factory=QRScanner,
+            media_stream_constraints={"video": True, "audio": False},
+            async_processing=True,
+        )
+
+        status_placeholder = st.empty()
+        result_placeholder = st.empty()
+
+        if ctx.state.playing and ctx.video_processor:
+            while ctx.state.playing:
+                scanned = ctx.video_processor.get_last_data()
+                if scanned:
+                    scanned = scanned.strip()
+
+                if scanned and scanned != st.session_state.scan_last_processed:
+                    st.session_state.scan_last_processed = scanned
+                    st.session_state.scan_added_product = None
+
+                    parsed = None
+                    try:
+                        parsed = json.loads(scanned)
+                    except (TypeError, json.JSONDecodeError):
+                        parsed = None
+
+                    existing_products = api_get("/products/") or []
+                    sku_map = {
+                        str(p["sku"]).strip().upper(): p
+                        for p in existing_products
+                        if p.get("sku")
+                    }
+
+                    if isinstance(parsed, dict):
+                        p_name = str(parsed.get("product", "")).strip()
+                        p_sku = str(parsed.get("sku", "")).strip()
+                        p_category = str(parsed.get("category", "")).strip()
+
+                        if p_name and p_sku and p_category:
+                            existing = sku_map.get(p_sku.upper())
+                            if existing:
+                                st.session_state.scan_added_product = {
+                                    "product": existing,
+                                    "message": f"Product with SKU **{p_sku}** already exists.",
+                                    "is_new": False,
+                                }
+                            else:
+                                created = api_post(
+                                    "/products/",
+                                    {
+                                        "name": p_name,
+                                        "category": p_category,
+                                        "sku": p_sku,
+                                        "supplier_id": None,
+                                    },
+                                )
+                                if created:
+                                    api_post("/inventory/update", {
+                                        "product_id": created["id"],
+                                        "store_id": st.session_state.active_store_id,
+                                        "stock": 1,
+                                        "reorder_threshold": 10,
+                                    })
+                                    st.session_state.scan_added_product = {
+                                        "product": created,
+                                        "message": f"Added **{p_name}** (SKU {p_sku}) to catalog & inventory!",
+                                        "is_new": True,
+                                    }
+                                else:
+                                    st.session_state.scan_added_product = {
+                                        "product": None,
+                                        "message": "Failed to add product to database.",
+                                        "is_new": False,
+                                    }
+                        else:
+                            st.session_state.scan_added_product = {
+                                "product": None,
+                                "message": "QR JSON is missing product, sku, or category fields.",
+                                "is_new": False,
+                            }
+                    else:
+                        matched = sku_map.get(scanned.upper()) if scanned else None
+                        if matched:
+                            st.session_state.scan_added_product = {
+                                "product": matched,
+                                "message": f"Found product **{matched['name']}** (SKU {matched.get('sku', 'N/A')}).",
+                                "is_new": False,
+                            }
+                        else:
+                            st.session_state.scan_added_product = {
+                                "product": None,
+                                "message": f"Scanned code `{scanned}` did not match any product or valid JSON.",
+                                "is_new": False,
+                            }
+
+                scan_info = st.session_state.scan_added_product
+                if scan_info:
+                    if scan_info.get("is_new"):
+                        status_placeholder.success(f"✅ {scan_info['message']}")
+                    elif scan_info.get("product"):
+                        status_placeholder.info(scan_info["message"])
+                    else:
+                        status_placeholder.warning(scan_info["message"])
+
+                    with result_placeholder.container():
+                        prod = scan_info.get("product")
+                        if prod:
+                            c1, c2, c3 = st.columns(3)
+                            c1.metric("Product", prod.get("name", "N/A"))
+                            c2.metric("SKU", prod.get("sku", "N/A"))
+                            c3.metric("Category", prod.get("category", "N/A"))
+                else:
+                    status_placeholder.caption("Point your camera at a product QR code...")
+
+                time.sleep(0.4)
+        else:
+            if st.session_state.scan_added_product and st.session_state.scan_added_product.get("is_new"):
+                st.success(f"✅ {st.session_state.scan_added_product['message']}")
+                prod = st.session_state.scan_added_product.get("product")
+                if prod:
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Product", prod.get("name", "N/A"))
+                    c2.metric("SKU", prod.get("sku", "N/A"))
+                    c3.metric("Category", prod.get("category", "N/A"))
+            st.caption("Click **Start** to begin scanning product QR codes.")
+
     # Product list
     products = api_get("/products/")
     if products:
-        st.markdown("### 📦 Product Catalog")
+        st.markdown("### Catalog")
         df = pd.DataFrame(products)
         st.dataframe(df, use_container_width=True, hide_index=True)
     else:
@@ -667,86 +807,64 @@ elif page == "Forecast":
 
 
 # ═══════════════════════════════════════════════════════════════════
-# PAGE: QR SCANNER
+# PAGE: QR GENERATOR
 # ═══════════════════════════════════════════════════════════════════
-elif page == "QR Scanner":
-    st.markdown("# 📷 Live Webcam QR Scanner")
-    st.markdown("Scan product QR codes and view live inventory details.")
+elif page == "QR Generator":
+    st.markdown("# 🧾 QR Generator")
+    st.markdown("Generate and store QR code data for product labels.")
     st.markdown("---")
 
-    ctx = webrtc_streamer(
-        key="qr-scanner",
-        video_processor_factory=QRScanner,
-        media_stream_constraints={"video": True, "audio": False},
-        async_processing=True,
-    )
+    col1, col2 = st.columns(2)
+    with col1:
+        qr_product = st.text_input("Product", placeholder="e.g. Widget Alpha")
+        qr_sku = st.text_input("SKU", placeholder="e.g. P101")
+    with col2:
+        qr_category = st.text_input("Category", placeholder="e.g. Electronics")
+        qr_price = st.number_input("Price", min_value=0.0, value=0.0, step=1.0)
 
-    if "last_scanned_qr" not in st.session_state:
-        st.session_state.last_scanned_qr = None
+    if st.button("Generate QR", use_container_width=True, type="primary"):
+        if not qr_product.strip() or not qr_sku.strip() or not qr_category.strip():
+            st.warning("Please fill Product, SKU, and Category.")
+        else:
+            payload_dict = {
+                "product": qr_product.strip(),
+                "sku": qr_sku.strip(),
+                "category": qr_category.strip(),
+                "price": float(qr_price),
+            }
+            payload_json = json.dumps(payload_dict, separators=(",", ":"), ensure_ascii=True)
+            saved = api_post("/qr-codes/", {**payload_dict, "qr_payload": payload_json})
 
-    if ctx.state.playing and ctx.video_processor:
-        scanned_placeholder = st.empty()
-        details_placeholder = st.empty()
+            if saved:
+                qr_image = qrcode.make(payload_json)
+                buffer = io.BytesIO()
+                qr_image.save(buffer, format="PNG")
+                buffer.seek(0)
 
-        # Poll decoded data from the video processor thread while the stream is active.
-        while ctx.state.playing:
-            scanned = ctx.video_processor.get_last_data()
-            if scanned:
-                scanned = scanned.strip()
-                st.session_state.last_scanned_qr = scanned
+                st.success("QR generated and stored successfully.")
+                st.code(payload_json, language="json")
+                st.image(buffer.getvalue(), caption=f"QR for SKU {payload_dict['sku']}", width=280)
+                st.download_button(
+                    label="⬇️ Download QR PNG",
+                    data=buffer.getvalue(),
+                    file_name=f"{payload_dict['sku']}_qr.png",
+                    mime="image/png",
+                    use_container_width=True,
+                )
 
-            current_value = st.session_state.last_scanned_qr
-            if current_value:
-                scanned_placeholder.success(f"Scanned: {current_value}")
-            else:
-                scanned_placeholder.caption("No QR detected yet. Point your camera at a QR code.")
-
-            with details_placeholder.container():
-                if current_value and (
-                    current_value.startswith("http://")
-                    or current_value.startswith("https://")
-                ):
-                    st.markdown(f"Decoded URL: [{current_value}]({current_value})")
-
-                products = api_get("/products/") or []
-                inventory_data = api_get("/inventory/") or []
-                inventory_data = [
-                    i for i in inventory_data if i.get("store_id") == st.session_state.active_store_id
-                ]
-
-                product_by_id = {p["id"]: p for p in products}
-                sku_map = {
-                    str(p["sku"]).strip().upper(): p
-                    for p in products
-                    if p.get("sku")
-                }
-
-                matched_product = None
-                if current_value:
-                    matched_product = sku_map.get(current_value.upper())
-                    if matched_product is None and current_value.isdigit():
-                        matched_product = product_by_id.get(int(current_value))
-
-                if matched_product:
-                    inv_record = next(
-                        (
-                            row for row in inventory_data
-                            if row.get("product_id") == matched_product["id"]
-                        ),
-                        None,
-                    )
-                    if inv_record:
-                        st.write("**Product:**", matched_product["name"])
-                        st.write("**Stock:**", inv_record.get("stock", 0))
-                        st.write("**Reorder Threshold:**", inv_record.get("reorder_threshold", 0))
-                    else:
-                        st.warning("Product found, but no inventory record exists for this store.")
-                elif current_value:
-                    st.info("Scanned code did not match any product SKU or numeric product ID.")
-
-            time.sleep(0.4)
+    st.markdown("---")
+    st.markdown("### Recent Generated QR Records")
+    qr_records = api_get("/qr-codes/") or []
+    if qr_records:
+        qr_df = pd.DataFrame(qr_records)
+        st.dataframe(
+            qr_df[["product", "sku", "category", "price", "created_at"]],
+            use_container_width=True,
+            hide_index=True,
+        )
     else:
-        st.caption("Click Start to begin live scanning.")
+        st.info("No QR records yet. Generate one above.")
+
 
 
 # ═══════════════════════════════════════════════════════════════════
