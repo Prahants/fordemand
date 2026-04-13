@@ -88,7 +88,6 @@ def run_forecast_pipeline(
     # Average forecasted daily demand
     avg_forecast = float(forecasts_df["predicted_value"].mean())
 
-    # Safety Stock = Z * std_dev * sqrt(lead_time)
     safety_stock = calculate_safety_stock(std_dev, lead_time, z_score)
 
     # Reorder Point = (avg_forecast * lead_time) + safety_stock

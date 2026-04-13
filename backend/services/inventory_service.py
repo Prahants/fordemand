@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from backend.db.models import Inventory, Product
 
 
-# ─── Default Configuration ────────────────────────────────────────
+
 DEFAULT_LEAD_TIME = 3  # days
 DEFAULT_Z_SCORE = 1.65  # 95% service level
 
