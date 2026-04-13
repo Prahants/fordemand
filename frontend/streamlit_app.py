@@ -98,10 +98,21 @@ st.markdown("""
 
 # ─── Helper Functions ────────────────────────────────────────
 
+def _auth_headers() -> dict:
+    role = st.session_state.get("active_role", "staff")
+    return {"X-Role": role}
+
+ROLE_PAGES = {
+    "admin": ["Dashboard", "Products", "Inventory", "Sales Entry", "Forecast", "Alerts"],
+    "manager": ["Dashboard", "Products", "Inventory", "Sales Entry", "Forecast", "Alerts"],
+    "staff": ["Dashboard", "Inventory", "Sales Entry", "Forecast", "Alerts"],
+}
+
+
 def api_get(endpoint: str):
     """Make a GET request to the backend API."""
     try:
-        resp = requests.get(f"{API_BASE}{endpoint}", timeout=30)
+        resp = requests.get(f"{API_BASE}{endpoint}", headers=_auth_headers(), timeout=30)
         resp.raise_for_status()
         return resp.json()
     except requests.exceptions.ConnectionError:
@@ -116,7 +127,7 @@ def api_get(endpoint: str):
 def api_post(endpoint: str, data: dict):
     """Make a POST request to the backend API."""
     try:
-        resp = requests.post(f"{API_BASE}{endpoint}", json=data, timeout=30)
+        resp = requests.post(f"{API_BASE}{endpoint}", json=data, headers=_auth_headers(), timeout=30)
         resp.raise_for_status()
         return resp.json()
     except requests.exceptions.ConnectionError:
@@ -141,23 +152,44 @@ def create_plotly_theme():
 
 # ─── Sidebar Navigation ──────────────────────────────────────────
 with st.sidebar:
+    if "active_role" not in st.session_state:
+        st.session_state.active_role = "manager"
+    st.session_state.active_role = st.selectbox(
+        "Role",
+        options=["admin", "manager", "staff"],
+        index=["admin", "manager", "staff"].index(st.session_state.active_role),
+    )
+
+    stores = api_get("/master/stores") or [{"id": 1, "name": "Main Store"}]
+    store_options = {s["name"]: s["id"] for s in stores}
+    if "active_store_id" not in st.session_state:
+        st.session_state.active_store_id = next(iter(store_options.values()))
+    selected_store_name = st.selectbox("Store", options=list(store_options.keys()))
+    st.session_state.active_store_id = store_options[selected_store_name]
+
+    st.markdown("---")
+
     st.markdown("## 📦 Inventory System")
     st.markdown("---")
 
+    allowed_pages = ROLE_PAGES.get(st.session_state.active_role, ROLE_PAGES["staff"])
     page = st.radio(
         "Navigate",
-        ["🏠 Dashboard", "📋 Products", "📦 Inventory", "💰 Sales Entry", "📈 Forecast", "🚨 Alerts"],
+        allowed_pages,
         label_visibility="collapsed",
     )
 
     st.markdown("---")
     st.markdown("### ⚙️ Quick Actions")
 
-    if st.button("🌱 Seed Database", use_container_width=True):
-        result = api_post("/seed", {})
-        if result:
-            st.success(f"✅ Seeded! {result.get('sales_records_loaded', 0)} sales records loaded.")
-            st.rerun()
+    if st.session_state.active_role == "admin":
+        if st.button("🌱 Seed Database", use_container_width=True):
+            result = api_post("/seed", {})
+            if result:
+                st.success(f"✅ Seeded! {result.get('sales_records_loaded', 0)} sales records loaded.")
+                st.rerun()
+    else:
+        st.caption("Seed action is available for admin only.")
 
     st.markdown("---")
     st.markdown(
@@ -170,15 +202,23 @@ with st.sidebar:
 # ═══════════════════════════════════════════════════════════════════
 # PAGE: DASHBOARD
 # ═══════════════════════════════════════════════════════════════════
-if page == "🏠 Dashboard":
-    st.markdown("# 🏠 Dashboard")
+if page == "Dashboard":
+    st.markdown("# Dashboard")
     st.markdown("Overview of your inventory system at a glance.")
     st.markdown("---")
 
     # Fetch data for metrics
     products = api_get("/products/")
     inventory_data = api_get("/inventory/")
+    if inventory_data:
+        inventory_data = [
+            i for i in inventory_data if i.get("store_id") == st.session_state.active_store_id
+        ]
     alerts_data = api_get("/alerts/")
+    if alerts_data:
+        alerts_data = [
+            a for a in alerts_data if a.get("store_id") == st.session_state.active_store_id
+        ]
 
     if products is not None:
         col1, col2, col3, col4 = st.columns(4)
@@ -243,7 +283,7 @@ if page == "🏠 Dashboard":
 # ═══════════════════════════════════════════════════════════════════
 # PAGE: PRODUCTS
 # ═══════════════════════════════════════════════════════════════════
-elif page == "📋 Products":
+elif page == "Products":
     st.markdown("# 📋 Products")
     st.markdown("Manage your product catalog.")
     st.markdown("---")
@@ -252,13 +292,29 @@ elif page == "📋 Products":
     with st.expander("➕ Add New Product", expanded=False):
         col1, col2 = st.columns(2)
         with col1:
-            prod_name = st.text_input("Product Name", placeholder="e.g. Widget Delta")
+            prod_name = st.text_input("Product Name", placeholder="e.g. Name of the product")
         with col2:
             prod_category = st.selectbox("Category", ["Electronics", "Accessories", "Hardware", "Software", "Other"])
+        col3, col4 = st.columns(2)
+        with col3:
+            prod_sku = st.text_input("SKU", placeholder="e.g. P200")
+        with col4:
+            suppliers = api_get("/master/suppliers") or []
+            supplier_options = {"None": None}
+            supplier_options.update({s["name"]: s["id"] for s in suppliers})
+            supplier_name = st.selectbox("Supplier", list(supplier_options.keys()))
 
         if st.button("✅ Create Product", use_container_width=True):
             if prod_name:
-                result = api_post("/products/", {"name": prod_name, "category": prod_category})
+                result = api_post(
+                    "/products/",
+                    {
+                        "name": prod_name,
+                        "category": prod_category,
+                        "sku": prod_sku or None,
+                        "supplier_id": supplier_options[supplier_name],
+                    },
+                )
                 if result:
                     st.success(f"✅ Product '{prod_name}' created with ID {result['id']}")
                     st.rerun()
@@ -278,7 +334,7 @@ elif page == "📋 Products":
 # ═══════════════════════════════════════════════════════════════════
 # PAGE: INVENTORY
 # ═══════════════════════════════════════════════════════════════════
-elif page == "📦 Inventory":
+elif page == "Inventory":
     st.markdown("# 📦 Inventory")
     st.markdown("Monitor and update stock levels.")
     st.markdown("---")
@@ -298,6 +354,7 @@ elif page == "📦 Inventory":
             if st.button("📥 Update Stock", use_container_width=True):
                 result = api_post("/inventory/update", {
                     "product_id": product_options[selected_product],
+                    "store_id": st.session_state.active_store_id,
                     "stock": new_stock,
                     "reorder_threshold": new_threshold,
                 })
@@ -307,6 +364,10 @@ elif page == "📦 Inventory":
 
     # Inventory table
     inventory_data = api_get("/inventory/")
+    if inventory_data:
+        inventory_data = [
+            i for i in inventory_data if i.get("store_id") == st.session_state.active_store_id
+        ]
     if inventory_data:
         st.markdown("### 📊 Current Inventory Levels")
         inv_df = pd.DataFrame(inventory_data)
@@ -328,7 +389,7 @@ elif page == "📦 Inventory":
 # ═══════════════════════════════════════════════════════════════════
 # PAGE: SALES ENTRY
 # ═══════════════════════════════════════════════════════════════════
-elif page == "💰 Sales Entry":
+elif page == "Sales Entry":
     st.markdown("# 💰 Sales Entry")
     st.markdown("Record new sales and view sales history.")
     st.markdown("---")
@@ -338,7 +399,7 @@ elif page == "💰 Sales Entry":
     if products:
         # Add sale form
         st.markdown("### ➕ Record a Sale")
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             product_options = {p["name"]: p["id"] for p in products}
             selected_product = st.selectbox("Product", list(product_options.keys()))
@@ -346,12 +407,19 @@ elif page == "💰 Sales Entry":
             sale_date = st.date_input("Sale Date", value=date.today())
         with col3:
             quantity = st.number_input("Quantity Sold", min_value=1, value=1, step=1)
+        with col4:
+            promotion_flag = st.checkbox("Promotion Sale", value=False)
+        with col5:
+            season_tag = st.selectbox("Season", ["none", "summer", "winter", "festival"])
 
         if st.button("💾 Save Sale", use_container_width=True):
             result = api_post("/sales/add", {
                 "product_id": product_options[selected_product],
+                "store_id": st.session_state.active_store_id,
                 "date": sale_date.isoformat(),
                 "quantity_sold": quantity,
+                "promotion_flag": promotion_flag,
+                "season_tag": None if season_tag == "none" else season_tag,
             })
             if result:
                 st.success(f"✅ Recorded: {quantity} units of '{selected_product}' on {sale_date}")
@@ -361,7 +429,9 @@ elif page == "💰 Sales Entry":
         # Sales history
         st.markdown("### 📈 Sales History")
         selected_for_history = st.selectbox("View history for", list(product_options.keys()), key="history_product")
-        sales_data = api_get(f"/sales/{product_options[selected_for_history]}")
+        sales_data = api_get(
+            f"/sales/{product_options[selected_for_history]}?store_id={st.session_state.active_store_id}"
+        )
 
         if sales_data:
             sales_df = pd.DataFrame(sales_data)
@@ -404,7 +474,7 @@ elif page == "💰 Sales Entry":
 # ═══════════════════════════════════════════════════════════════════
 # PAGE: FORECAST (Key Feature)
 # ═══════════════════════════════════════════════════════════════════
-elif page == "📈 Forecast":
+elif page == "Forecast":
     st.markdown("# 📈 Demand Forecast")
     st.markdown("Prophet-powered demand forecasting with configurable parameters.")
     st.markdown("---")
@@ -431,7 +501,7 @@ elif page == "📈 Forecast":
 
             with st.spinner("🧠 Running Prophet model..."):
                 forecast_result = api_get(
-                    f"/forecast/{product_id}?lead_time={lead_time}&service_level={service_level}"
+                    f"/forecast/{product_id}?store_id={st.session_state.active_store_id}&lead_time={lead_time}&service_level={service_level}"
                 )
 
             if forecast_result and "forecasts" in forecast_result:
@@ -461,7 +531,7 @@ elif page == "📈 Forecast":
                 st.markdown("### 📈 Historical Sales + Forecast")
 
                 # Fetch historical sales for the chart
-                sales_data = api_get(f"/sales/{product_id}")
+                sales_data = api_get(f"/sales/{product_id}?store_id={st.session_state.active_store_id}")
 
                 fig = go.Figure()
 
@@ -527,6 +597,15 @@ elif page == "📈 Forecast":
                     st.markdown("---")
                     st.error(f"🚨 {forecast_result['alert']['message']}")
 
+                logs = api_get(
+                    f"/forecast-logs/?product_id={product_id}&store_id={st.session_state.active_store_id}"
+                )
+                if logs:
+                    st.markdown("### 📉 Forecast Variance Logs")
+                    logs_df = pd.DataFrame(logs)
+                    cols = ["horizon_date", "predicted_demand", "actual_demand", "variance", "generated_at"]
+                    st.dataframe(logs_df[cols], use_container_width=True, hide_index=True)
+
             elif forecast_result and "error" in forecast_result:
                 st.error(forecast_result["error"])
     else:
@@ -536,12 +615,16 @@ elif page == "📈 Forecast":
 # ═══════════════════════════════════════════════════════════════════
 # PAGE: ALERTS
 # ═══════════════════════════════════════════════════════════════════
-elif page == "🚨 Alerts":
+elif page == "Alerts":
     st.markdown("# 🚨 Alerts")
     st.markdown("Low-stock alerts generated by the forecasting system.")
     st.markdown("---")
 
     alerts_data = api_get("/alerts/")
+    if alerts_data:
+        alerts_data = [
+            a for a in alerts_data if a.get("store_id") == st.session_state.active_store_id
+        ]
 
     if alerts_data:
         st.metric("Total Alerts", len(alerts_data))
@@ -549,13 +632,21 @@ elif page == "🚨 Alerts":
 
         for alert in alerts_data:
             with st.container():
-                col1, col2 = st.columns([4, 1])
+                col1, col2, col3 = st.columns([4, 1, 1])
                 with col1:
-                    st.warning(alert["message"])
+                    st.warning(f"[{alert.get('status', 'open').upper()}] {alert['message']}")
                 with col2:
                     created = alert.get("created_at", "")
                     if created:
                         st.caption(f"🕐 {created[:19]}")
+                with col3:
+                    if (
+                        st.session_state.active_role in {"admin", "manager"}
+                        and alert.get("status", "open") != "resolved"
+                    ):
+                        if st.button("Resolve", key=f"resolve_{alert['id']}"):
+                            api_post(f"/alerts/{alert['id']}/status?status=resolved", {})
+                            st.rerun()
     else:
         st.success("✅ No active alerts. All stock levels are healthy!")
         st.balloons()

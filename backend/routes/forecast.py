@@ -19,6 +19,7 @@ from backend.db.database import get_db
 from backend.db.models import Product
 from backend.services.forecasting import run_forecast_pipeline
 from backend.services.inventory_service import DEFAULT_LEAD_TIME, DEFAULT_Z_SCORE
+from backend.services.auth import require_role
 
 router = APIRouter(prefix="/forecast", tags=["Forecast"])
 
@@ -26,9 +27,11 @@ router = APIRouter(prefix="/forecast", tags=["Forecast"])
 @router.get("/{product_id}")
 def get_forecast(
     product_id: int,
+    store_id: int = Query(default=1, description="Store ID"),
     lead_time: int = Query(default=DEFAULT_LEAD_TIME, description="Lead time in days"),
     service_level: float = Query(default=DEFAULT_Z_SCORE, description="Z-score for service level"),
     db: Session = Depends(get_db),
+    _: str = Depends(require_role({"admin", "manager", "staff"})),
 ):
     """
     Run the full demand forecasting pipeline for a product.
@@ -53,6 +56,7 @@ def get_forecast(
     result = run_forecast_pipeline(
         db=db,
         product_id=product_id,
+        store_id=store_id,
         lead_time=lead_time,
         z_score=service_level,
     )

@@ -16,7 +16,7 @@ import numpy as np
 from sqlalchemy.orm import Session
 from datetime import date
 
-from backend.db.models import Sales, Forecast, Inventory
+from backend.db.models import Sales, Forecast, Inventory, ForecastLog
 from backend.services.inventory_service import (
     calculate_safety_stock,
     calculate_reorder_point,
@@ -30,6 +30,7 @@ from ml.prophet_model import forecast_demand, evaluate_model
 def run_forecast_pipeline(
     db: Session,
     product_id: int,
+    store_id: int = 1,
     lead_time: int = DEFAULT_LEAD_TIME,
     z_score: float = DEFAULT_Z_SCORE,
 ) -> dict:
@@ -61,7 +62,7 @@ def run_forecast_pipeline(
     # ─── Step 1: Fetch Sales Data ────────────────────────────────
     sales_records = (
         db.query(Sales)
-        .filter(Sales.product_id == product_id)
+        .filter(Sales.product_id == product_id, Sales.store_id == store_id)
         .order_by(Sales.date)
         .all()
     )
@@ -128,7 +129,11 @@ def run_forecast_pipeline(
         db.refresh(f)
 
     # ─── Step 9: Check Alerts ─────────────────────────────────────
-    inventory = db.query(Inventory).filter(Inventory.product_id == product_id).first()
+    inventory = (
+        db.query(Inventory)
+        .filter(Inventory.product_id == product_id, Inventory.store_id == store_id)
+        .first()
+    )
     alert = None
     if inventory:
         # Update reorder threshold in inventory
@@ -136,12 +141,44 @@ def run_forecast_pipeline(
         db.commit()
 
         alert = check_and_create_alerts(
-            db, product_id, inventory.stock, reorder_point
+            db, product_id, store_id, inventory.stock, reorder_point
         )
+
+    # ─── Step 9.5: Store Forecast Logs (predicted vs actual variance) ───────
+    for _, row in forecasts_df.iterrows():
+        horizon_date = pd.Timestamp(row["date"]).date()
+        actual_sale = (
+            db.query(Sales)
+            .filter(
+                Sales.product_id == product_id,
+                Sales.store_id == store_id,
+                Sales.date == horizon_date,
+            )
+            .first()
+        )
+        actual_demand = float(actual_sale.quantity_sold) if actual_sale else None
+        predicted_demand = round(float(row["predicted_value"]), 2)
+        variance = (
+            round(actual_demand - predicted_demand, 2)
+            if actual_demand is not None
+            else None
+        )
+        db.add(
+            ForecastLog(
+                product_id=product_id,
+                store_id=store_id,
+                horizon_date=horizon_date,
+                predicted_demand=predicted_demand,
+                actual_demand=actual_demand,
+                variance=variance,
+            )
+        )
+    db.commit()
 
     # ─── Step 10: Return Results ──────────────────────────────────
     return {
         "product_id": product_id,
+        "store_id": store_id,
         "forecasts": [
             {
                 "id": f.id,

@@ -15,14 +15,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from backend.db.database import engine, Base, get_db
-from backend.db.models import Product, Sales, Inventory
-from backend.routes import products, inventory, sales, forecast, alerts
+from backend.db.models import Product, Sales, Inventory, Store, Supplier, User
+from backend.db.migrations import ensure_sqlite_schema
+from backend.routes import products, inventory, sales, forecast, alerts, master_data, forecast_logs
+from backend.services.auth import require_role
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Create database tables on startup."""
     Base.metadata.create_all(bind=engine)
+    ensure_sqlite_schema(engine)
     yield
 
 
@@ -49,6 +52,8 @@ app.include_router(inventory.router)
 app.include_router(sales.router)
 app.include_router(forecast.router)
 app.include_router(alerts.router)
+app.include_router(master_data.router)
+app.include_router(forecast_logs.router)
 
 
 @app.get("/", tags=["Health"])
@@ -62,7 +67,10 @@ def root():
 
 
 @app.post("/seed", tags=["Setup"])
-def seed_data(db: Session = Depends(get_db)):
+def seed_data(
+    db: Session = Depends(get_db),
+    _: str = Depends(require_role({"admin"})),
+):
     """
     Seed the database with sample products and sales data from CSV.
 
@@ -74,7 +82,35 @@ def seed_data(db: Session = Depends(get_db)):
     Returns:
         Summary of seeded data counts
     """
-    # ─── Step 1: Create Products ──────────────────────────────────
+    # ─── Step 1: Ensure base stores/suppliers/users ──────────────
+    default_store = db.query(Store).filter(Store.name == "Main Store").first()
+    if not default_store:
+        default_store = Store(name="Main Store", location="HQ", store_type="store")
+        db.add(default_store)
+        db.commit()
+        db.refresh(default_store)
+
+    backup_store = db.query(Store).filter(Store.name == "Warehouse A").first()
+    if not backup_store:
+        backup_store = Store(name="Warehouse A", location="Zone 1", store_type="warehouse")
+        db.add(backup_store)
+        db.commit()
+
+    default_supplier = db.query(Supplier).filter(Supplier.name == "Default Supplier").first()
+    if not default_supplier:
+        default_supplier = Supplier(name="Default Supplier")
+        db.add(default_supplier)
+        db.commit()
+        db.refresh(default_supplier)
+
+    admin = db.query(User).filter(User.username == "admin").first()
+    if not admin:
+        db.add(User(username="admin", role="admin"))
+        db.add(User(username="manager", role="manager"))
+        db.add(User(username="staff", role="staff"))
+        db.commit()
+
+    # ─── Step 2: Create Products ──────────────────────────────────
     product_map = {
         "P101": {"name": "Widget Alpha", "category": "Electronics"},
         "P102": {"name": "Widget Beta", "category": "Electronics"},
@@ -86,7 +122,12 @@ def seed_data(db: Session = Depends(get_db)):
         # Check if product already exists by name
         existing = db.query(Product).filter(Product.name == info["name"]).first()
         if not existing:
-            product = Product(name=info["name"], category=info["category"])
+            product = Product(
+                name=info["name"],
+                category=info["category"],
+                sku=code,
+                supplier_id=default_supplier.id,
+            )
             db.add(product)
             db.commit()
             db.refresh(product)
@@ -94,7 +135,7 @@ def seed_data(db: Session = Depends(get_db)):
         else:
             created_products[code] = existing.id
 
-    # ─── Step 2: Load Sales Data from CSV ─────────────────────────
+    # ─── Step 3: Load Sales Data from CSV ─────────────────────────
     csv_path = os.path.join(os.path.dirname(__file__), "..", "data", "sales_data.csv")
     csv_path = os.path.abspath(csv_path)
 
@@ -111,15 +152,17 @@ def seed_data(db: Session = Depends(get_db)):
                 if product_code in created_products:
                     sale = Sales(
                         product_id=created_products[product_code],
+                        store_id=default_store.id,
                         date=date.fromisoformat(row["date"]),
                         quantity_sold=int(row["quantity_sold"]),
+                        promotion_flag=False,
                     )
                     db.add(sale)
                     sales_count += 1
 
         db.commit()
 
-    # ─── Step 3: Create Initial Inventory ─────────────────────────
+    # ─── Step 4: Create Initial Inventory ─────────────────────────
     inventory_defaults = {
         "P101": 50,
         "P102": 30,
@@ -129,11 +172,17 @@ def seed_data(db: Session = Depends(get_db)):
     for code, stock in inventory_defaults.items():
         product_id = created_products[code]
         existing_inv = (
-            db.query(Inventory).filter(Inventory.product_id == product_id).first()
+            db.query(Inventory)
+            .filter(
+                Inventory.product_id == product_id,
+                Inventory.store_id == default_store.id,
+            )
+            .first()
         )
         if not existing_inv:
             inv = Inventory(
                 product_id=product_id,
+                store_id=default_store.id,
                 stock=stock,
                 reorder_threshold=10,
             )

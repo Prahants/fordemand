@@ -8,11 +8,10 @@ Implements:
 """
 
 import numpy as np
-import pandas as pd
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
-from backend.db.models import Inventory, Product
+from backend.db.models import Inventory, Product, Store
 
 
 
@@ -67,6 +66,7 @@ def calculate_reorder_point(
 def update_inventory_stock(
     db: Session,
     product_id: int,
+    store_id: int,
     stock: int,
     reorder_threshold: int = None,
 ) -> Inventory:
@@ -82,7 +82,11 @@ def update_inventory_stock(
     Returns:
         Updated Inventory ORM object
     """
-    inventory = db.query(Inventory).filter(Inventory.product_id == product_id).first()
+    inventory = (
+        db.query(Inventory)
+        .filter(Inventory.product_id == product_id, Inventory.store_id == store_id)
+        .first()
+    )
 
     if inventory:
         # Update existing inventory
@@ -94,6 +98,7 @@ def update_inventory_stock(
         # Create new inventory record
         inventory = Inventory(
             product_id=product_id,
+            store_id=store_id,
             stock=stock,
             reorder_threshold=reorder_threshold or 10,
             last_updated=datetime.now(timezone.utc),
@@ -113,19 +118,22 @@ def get_all_inventory(db: Session) -> list:
         List of dicts with inventory data and product names
     """
     results = (
-        db.query(Inventory, Product.name)
+        db.query(Inventory, Product.name, Store.name)
         .join(Product, Inventory.product_id == Product.id)
+        .join(Store, Inventory.store_id == Store.id)
         .all()
     )
 
     inventory_list = []
-    for inv, product_name in results:
+    for inv, product_name, store_name in results:
         inventory_list.append({
             "id": inv.id,
             "product_id": inv.product_id,
+            "store_id": inv.store_id,
             "stock": inv.stock,
             "reorder_threshold": inv.reorder_threshold,
             "last_updated": inv.last_updated,
             "product_name": product_name,
+            "store_name": store_name,
         })
     return inventory_list
