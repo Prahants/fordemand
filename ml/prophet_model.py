@@ -34,9 +34,9 @@ def forecast_demand(dataframe: pd.DataFrame, periods: int = 7) -> dict:
     """
 
     # ─── Step 1: Data Preprocessing ───────────────────────────────
-    # Sort by date and fill missing dates with forward fill
     df = dataframe.copy()
     df["date"] = pd.to_datetime(df["date"])
+    df = df.groupby("date", as_index=False)["quantity_sold"].sum()
     df = df.sort_values("date")
 
     # Create complete date range and fill gaps
@@ -71,7 +71,6 @@ def forecast_demand(dataframe: pd.DataFrame, periods: int = 7) -> dict:
     future_forecast = forecast.tail(periods)[["ds", "yhat", "yhat_lower", "yhat_upper"]].copy()
     future_forecast = future_forecast.rename(columns={"ds": "date", "yhat": "predicted_value"})
 
-    # Ensure predictions are non-negative (can't sell negative quantities)
     future_forecast["predicted_value"] = future_forecast["predicted_value"].clip(lower=0)
 
     return {
@@ -121,7 +120,7 @@ def _moving_average_fallback(df: pd.DataFrame, periods: int) -> dict:
 
     return {
         "forecasts": future_forecast,
-        "method": "moving_average",
+        "method": "average",
         "model": None,
         "full_forecast": None,
     }

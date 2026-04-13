@@ -100,6 +100,202 @@ st.markdown("""
         border-radius: 10px;
         overflow: hidden;
     }
+
+    /* ─── Alert Card Styles ──────────────────────────────── */
+    .alert-card {
+        border-radius: 14px;
+        padding: 20px 24px;
+        margin-bottom: 16px;
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .alert-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .alert-card.critical {
+        background: linear-gradient(135deg, #2d1215 0%, #3b1520 100%);
+        border: 1px solid rgba(239,68,68,0.35);
+    }
+    .alert-card.warning {
+        background: linear-gradient(135deg, #2d2512 0%, #3b3015 100%);
+        border: 1px solid rgba(245,158,11,0.35);
+    }
+    .alert-card.resolved {
+        background: linear-gradient(135deg, #122d1a 0%, #153b20 100%);
+        border: 1px solid rgba(34,197,94,0.3);
+        opacity: 0.7;
+    }
+
+    .alert-severity {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .severity-critical {
+        background: rgba(239,68,68,0.2);
+        color: #f87171;
+        border: 1px solid rgba(239,68,68,0.3);
+    }
+    .severity-warning {
+        background: rgba(245,158,11,0.2);
+        color: #fbbf24;
+        border: 1px solid rgba(245,158,11,0.3);
+    }
+    .severity-resolved {
+        background: rgba(34,197,94,0.2);
+        color: #4ade80;
+        border: 1px solid rgba(34,197,94,0.3);
+    }
+
+    .alert-product-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #f0f0f5;
+        margin: 8px 0 4px 0;
+    }
+    .alert-store {
+        font-size: 0.8rem;
+        color: #8888a8;
+        margin-bottom: 14px;
+    }
+
+    .alert-stats {
+        display: flex;
+        gap: 24px;
+        margin: 12px 0;
+    }
+    .alert-stat {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .alert-stat-label {
+        font-size: 0.7rem;
+        color: #8888a8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .alert-stat-value {
+        font-size: 1.15rem;
+        font-weight: 700;
+    }
+    .stat-stock { color: #f87171; }
+    .stat-reorder { color: #fbbf24; }
+    .stat-deficit { color: #fb923c; }
+
+    .alert-timestamp {
+        font-size: 0.75rem;
+        color: #6b6b88;
+        margin-top: 10px;
+    }
+
+    /* Summary pill cards */
+    .summary-pill {
+        border-radius: 12px;
+        padding: 16px 20px;
+        text-align: center;
+    }
+    .pill-critical {
+        background: linear-gradient(135deg, #2d1215 0%, #3b1520 100%);
+        border: 1px solid rgba(239,68,68,0.3);
+    }
+    .pill-warning {
+        background: linear-gradient(135deg, #2d2512 0%, #3b3015 100%);
+        border: 1px solid rgba(245,158,11,0.3);
+    }
+    .pill-resolved {
+        background: linear-gradient(135deg, #122d1a 0%, #153b20 100%);
+        border: 1px solid rgba(34,197,94,0.3);
+    }
+    .pill-total {
+        background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .pill-number {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+    .pill-label {
+        font-size: 0.78rem;
+        color: #8888a8;
+        margin-top: 4px;
+    }
+
+    /* ─── Dashboard alert mini-cards ──────────────────────── */
+    .dash-alert {
+        border-radius: 10px;
+        padding: 14px 18px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+    .dash-alert.critical {
+        background: linear-gradient(135deg, #2d1215 0%, #3b1520 100%);
+        border-left: 4px solid #ef4444;
+    }
+    .dash-alert.warning {
+        background: linear-gradient(135deg, #2d2512 0%, #3b3015 100%);
+        border-left: 4px solid #f59e0b;
+    }
+    .dash-alert-icon { font-size: 1.4rem; }
+    .dash-alert-text {
+        font-size: 0.88rem;
+        color: #e0e0e5;
+        line-height: 1.4;
+    }
+    .dash-alert-text strong { color: #fff; }
+
+    /* ─── Styled Error Toast ─────────────────────────────── */
+    .error-toast {
+        border-radius: 14px;
+        padding: 28px 32px;
+        margin: 16px 0;
+        background: linear-gradient(135deg, #1a1020 0%, #2a1428 50%, #1a1020 100%);
+        border: 1px solid rgba(168, 85, 247, 0.25);
+        box-shadow: 0 0 30px rgba(168, 85, 247, 0.08), 0 4px 24px rgba(0,0,0,0.4);
+        position: relative;
+        overflow: hidden;
+    }
+    .error-toast::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #a855f7, #ec4899, #a855f7);
+    }
+    .error-toast-icon {
+        font-size: 2.2rem;
+        margin-bottom: 10px;
+    }
+    .error-toast-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #e8d5f5;
+        margin-bottom: 8px;
+    }
+    .error-toast-msg {
+        font-size: 0.9rem;
+        color: #b0a0c0;
+        line-height: 1.6;
+    }
+    .error-toast-hint {
+        margin-top: 16px;
+        padding: 12px 16px;
+        border-radius: 10px;
+        background: rgba(99, 102, 241, 0.08);
+        border: 1px solid rgba(99, 102, 241, 0.15);
+        font-size: 0.85rem;
+        color: #a5b4fc;
+        line-height: 1.5;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -166,6 +362,41 @@ class QRScanner(VideoProcessorBase):
             return self.last_data
 
 
+def _extract_error_detail(response) -> str:
+    """Pull the human-readable detail from a FastAPI error response."""
+    try:
+        body = response.json()
+        if isinstance(body, dict) and "detail" in body:
+            return body["detail"]
+    except Exception:
+        pass
+    return response.text or "Unknown error"
+
+
+def _show_error_toast(title: str, message: str, hint: str | None = None):
+    """Render a styled error card instead of a raw st.error."""
+    hint_html = ""
+    if hint:
+        hint_html = f'<div class="error-toast-hint">💡 {hint}</div>'
+    st.markdown(
+        f'<div class="error-toast">'
+        f'  <div class="error-toast-icon">⚠️</div>'
+        f'  <div class="error-toast-title">{title}</div>'
+        f'  <div class="error-toast-msg">{message}</div>'
+        f'  {hint_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _show_connection_error():
+    _show_error_toast(
+        "Connection Failed",
+        "Unable to reach the backend server. Please make sure the FastAPI server is running.",
+        "Run <code>uvicorn backend.main:app --reload</code> in your terminal to start the server.",
+    )
+
+
 def api_get(endpoint: str):
     """Make a GET request to the backend API."""
     try:
@@ -173,11 +404,11 @@ def api_get(endpoint: str):
         resp.raise_for_status()
         return resp.json()
     except requests.exceptions.ConnectionError:
-        st.error("⚠️ Cannot connect to backend. Make sure the FastAPI server is running!")
-        st.code("uvicorn backend.main:app --reload", language="bash")
+        _show_connection_error()
         return None
     except requests.exceptions.HTTPError as e:
-        st.error(f"API Error: {e.response.text}")
+        detail = _extract_error_detail(e.response)
+        _show_error_toast("Request Failed", detail)
         return None
 
 
@@ -188,10 +419,11 @@ def api_post(endpoint: str, data: dict):
         resp.raise_for_status()
         return resp.json()
     except requests.exceptions.ConnectionError:
-        st.error("⚠️ Cannot connect to backend. Make sure the FastAPI server is running!")
+        _show_connection_error()
         return None
     except requests.exceptions.HTTPError as e:
-        st.error(f"API Error: {e.response.text}")
+        detail = _extract_error_detail(e.response)
+        _show_error_toast("Request Failed", detail)
         return None
 
 
@@ -205,6 +437,31 @@ def create_plotly_theme():
         xaxis=dict(gridcolor="rgba(255,255,255,0.05)"),
         yaxis=dict(gridcolor="rgba(255,255,255,0.05)"),
     )
+
+
+import re
+
+def _parse_alert_message(msg: str) -> dict:
+    """Extract structured fields from an alert message string."""
+    info: dict = {"product": "Unknown", "store": "Unknown", "stock": None, "reorder": None, "raw": msg}
+    m = re.search(r"'([^']+)'\s+at\s+'([^']+)'", msg)
+    if m:
+        info["product"] = m.group(1)
+        info["store"] = m.group(2)
+    stock_m = re.search(r"has\s+(\d+)\s+units?", msg)
+    if stock_m:
+        info["stock"] = int(stock_m.group(1))
+    reorder_m = re.search(r"[Rr]eorder\s+point\s+is\s+(\d+)", msg)
+    if reorder_m:
+        info["reorder"] = int(reorder_m.group(1))
+    return info
+
+
+def _severity(stock, reorder) -> str:
+    if stock is None or reorder is None:
+        return "warning"
+    ratio = stock / reorder if reorder > 0 else 1.0
+    return "critical" if ratio < 0.5 else "warning"
 
 
 # ─── Sidebar Navigation ──────────────────────────────────────────
@@ -262,8 +519,8 @@ with st.sidebar:
 # PAGE: DASHBOARD
 # ═══════════════════════════════════════════════════════════════════
 if page == "Dashboard":
-    st.markdown("# Dashboard")
-    st.markdown("Overview of your inventory system at a glance.")
+    st.markdown("# 📊 Dashboard")
+    st.markdown("Real-time overview of stock levels, sales activity, and alerts across your stores.")
     st.markdown("---")
 
     # Fetch data for metrics
@@ -297,8 +554,8 @@ if page == "Dashboard":
                        delta_color="inverse")
 
         with col4:
-            alert_count = len(alerts_data) if alerts_data else 0
-            st.metric("Active Alerts", alert_count)
+            open_count = len([a for a in alerts_data if a.get("status", "open") != "resolved"]) if alerts_data else 0
+            st.metric("Open Alerts", open_count)
 
         st.markdown("---")
 
@@ -334,9 +591,21 @@ if page == "Dashboard":
 
         # Recent alerts
         if alerts_data:
-            st.markdown("### 🚨 Recent Alerts")
-            for alert in alerts_data[:5]:
-                st.warning(alert["message"])
+            open_dash_alerts = [a for a in alerts_data if a.get("status", "open") != "resolved"]
+            if open_dash_alerts:
+                st.markdown("### 🚨 Recent Alerts")
+                for alert in open_dash_alerts[:5]:
+                    info = _parse_alert_message(alert["message"])
+                    sev = _severity(info["stock"], info["reorder"])
+                    icon = "🔴" if sev == "critical" else "🟡"
+                    stock_text = f" — <strong>{info['stock']}</strong> in stock, reorder at <strong>{info['reorder']}</strong>" if info["stock"] is not None else ""
+                    st.markdown(
+                        f'<div class="dash-alert {sev}">'
+                        f'<span class="dash-alert-icon">{icon}</span>'
+                        f'<span class="dash-alert-text"><strong>{info["product"]}</strong>{stock_text}</span>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -530,7 +799,7 @@ elif page == "Products":
 # ═══════════════════════════════════════════════════════════════════
 elif page == "Inventory":
     st.markdown("# 📦 Inventory")
-    st.markdown("Monitor and update stock levels.")
+    st.markdown("Track current stock across products and set reorder thresholds to prevent stockouts.")
     st.markdown("---")
 
     # Update inventory form
@@ -585,7 +854,7 @@ elif page == "Inventory":
 # ═══════════════════════════════════════════════════════════════════
 elif page == "Sales Entry":
     st.markdown("# 💰 Sales Entry")
-    st.markdown("Record new sales and view sales history.")
+    st.markdown("Log daily sales and track performance trends by product.")
     st.markdown("---")
 
     products = api_get("/products/")
@@ -670,7 +939,7 @@ elif page == "Sales Entry":
 # ═══════════════════════════════════════════════════════════════════
 elif page == "Forecast":
     st.markdown("# 📈 Demand Forecast")
-    st.markdown("Prophet-powered demand forecasting with configurable parameters.")
+    st.markdown("Run ML-powered predictions to see future demand, safety stock, and reorder points.")
     st.markdown("---")
 
     products = api_get("/products/")
@@ -697,6 +966,15 @@ elif page == "Forecast":
                 forecast_result = api_get(
                     f"/forecast/{product_id}?store_id={st.session_state.active_store_id}&lead_time={lead_time}&service_level={service_level}"
                 )
+
+            if forecast_result is None:
+                _show_error_toast(
+                    "Forecast Unavailable",
+                    "The forecast could not be completed. This usually means the sales data "
+                    "is insufficient or contains anomalies.",
+                    "Go to <b>Sales Entry</b> and add at least 5–7 days of sales data, then re-run the forecast.",
+                )
+                st.stop()
 
             if forecast_result and "forecasts" in forecast_result:
                 st.markdown("---")
@@ -871,8 +1149,8 @@ elif page == "QR Generator":
 # PAGE: ALERTS
 # ═══════════════════════════════════════════════════════════════════
 elif page == "Alerts":
-    st.markdown("# 🚨 Alerts")
-    st.markdown("Low-stock alerts generated by the forecasting system.")
+    st.markdown("# 🚨 Alerts & Notifications")
+    st.markdown("Monitor low-stock warnings and take action before you run out.")
     st.markdown("---")
 
     alerts_data = api_get("/alerts/")
@@ -882,26 +1160,139 @@ elif page == "Alerts":
         ]
 
     if alerts_data:
-        st.metric("Total Alerts", len(alerts_data))
-        st.markdown("---")
+        open_alerts = [a for a in alerts_data if a.get("status", "open") != "resolved"]
+        resolved_alerts = [a for a in alerts_data if a.get("status", "open") == "resolved"]
+        critical_alerts = [
+            a for a in open_alerts
+            if _severity(
+                _parse_alert_message(a["message"])["stock"],
+                _parse_alert_message(a["message"])["reorder"],
+            ) == "critical"
+        ]
 
-        for alert in alerts_data:
-            with st.container():
-                col1, col2, col3 = st.columns([4, 1, 1])
-                with col1:
-                    st.warning(f"[{alert.get('status', 'open').upper()}] {alert['message']}")
-                with col2:
-                    created = alert.get("created_at", "")
-                    if created:
-                        st.caption(f"🕐 {created[:19]}")
-                with col3:
-                    if (
-                        st.session_state.active_role in {"admin", "manager"}
-                        and alert.get("status", "open") != "resolved"
-                    ):
-                        if st.button("Resolve", key=f"resolve_{alert['id']}"):
-                            api_post(f"/alerts/{alert['id']}/status?status=resolved", {})
-                            st.rerun()
+        # ── Summary pills ────────────────────────────────────
+        p1, p2, p3, p4 = st.columns(4)
+        with p1:
+            st.markdown(
+                f'<div class="summary-pill pill-total">'
+                f'<div class="pill-number" style="color:#c4b5fd">{len(alerts_data)}</div>'
+                f'<div class="pill-label">Total Alerts</div></div>',
+                unsafe_allow_html=True,
+            )
+        with p2:
+            st.markdown(
+                f'<div class="summary-pill pill-critical">'
+                f'<div class="pill-number" style="color:#f87171">{len(critical_alerts)}</div>'
+                f'<div class="pill-label">Critical</div></div>',
+                unsafe_allow_html=True,
+            )
+        with p3:
+            st.markdown(
+                f'<div class="summary-pill pill-warning">'
+                f'<div class="pill-number" style="color:#fbbf24">{len(open_alerts) - len(critical_alerts)}</div>'
+                f'<div class="pill-label">Warning</div></div>',
+                unsafe_allow_html=True,
+            )
+        with p4:
+            st.markdown(
+                f'<div class="summary-pill pill-resolved">'
+                f'<div class="pill-number" style="color:#4ade80">{len(resolved_alerts)}</div>'
+                f'<div class="pill-label">Resolved</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("")
+
+        # ── Filter tabs ──────────────────────────────────────
+        tab_all, tab_open, tab_resolved = st.tabs([
+            f"All  ({len(alerts_data)})",
+            f"🔴 Open  ({len(open_alerts)})",
+            f"✅ Resolved  ({len(resolved_alerts)})",
+        ])
+
+        def _render_alert_card(alert, tab_prefix="all"):
+            info = _parse_alert_message(alert["message"])
+            status = alert.get("status", "open")
+            sev = "resolved" if status == "resolved" else _severity(info["stock"], info["reorder"])
+            sev_label = {"critical": "Critical", "warning": "Warning", "resolved": "Resolved"}[sev]
+            sev_icon = {"critical": "🔴", "warning": "🟡", "resolved": "✅"}[sev]
+
+            stock_html = ""
+            if info["stock"] is not None and info["reorder"] is not None:
+                deficit = info["reorder"] - info["stock"]
+                stock_html = (
+                    f'<div class="alert-stats">'
+                    f'  <div class="alert-stat">'
+                    f'    <span class="alert-stat-label">Current Stock</span>'
+                    f'    <span class="alert-stat-value stat-stock">{info["stock"]} units</span>'
+                    f'  </div>'
+                    f'  <div class="alert-stat">'
+                    f'    <span class="alert-stat-label">Reorder Point</span>'
+                    f'    <span class="alert-stat-value stat-reorder">{info["reorder"]} units</span>'
+                    f'  </div>'
+                    f'  <div class="alert-stat">'
+                    f'    <span class="alert-stat-label">Deficit</span>'
+                    f'    <span class="alert-stat-value stat-deficit">{deficit} units</span>'
+                    f'  </div>'
+                    f'</div>'
+                )
+
+            created = alert.get("created_at", "")
+            time_str = ""
+            if created:
+                time_str = f'<div class="alert-timestamp">🕐 Created {created[:19].replace("T", " at ")}</div>'
+
+            card_html = (
+                f'<div class="alert-card {sev}">'
+                f'  <span class="alert-severity severity-{sev}">{sev_icon} {sev_label}</span>'
+                f'  <div class="alert-product-name">{info["product"]}</div>'
+                f'  <div class="alert-store">📍 {info["store"]}</div>'
+                f'  {stock_html}'
+                f'  {time_str}'
+                f'</div>'
+            )
+
+            card_col, action_col = st.columns([5, 1])
+            with card_col:
+                st.markdown(card_html, unsafe_allow_html=True)
+            with action_col:
+                st.markdown("<div style='height: 30px'></div>", unsafe_allow_html=True)
+                if status != "resolved" and st.session_state.active_role in {"admin", "manager"}:
+                    if st.button("✅ Resolve", key=f"resolve_{tab_prefix}_{alert['id']}", use_container_width=True):
+                        api_post(f"/alerts/{alert['id']}/status?status=resolved", {})
+                        st.rerun()
+                elif status == "resolved":
+                    st.markdown(
+                        "<p style='text-align:center;color:#4ade80;font-size:0.85rem;margin-top:8px;'>Resolved</p>",
+                        unsafe_allow_html=True,
+                    )
+
+        with tab_all:
+            for alert in alerts_data:
+                _render_alert_card(alert, tab_prefix="all")
+
+        with tab_open:
+            if open_alerts:
+                for alert in open_alerts:
+                    _render_alert_card(alert, tab_prefix="open")
+            else:
+                st.success("🎉 No open alerts — all stock levels are healthy!")
+
+        with tab_resolved:
+            if resolved_alerts:
+                for alert in resolved_alerts:
+                    _render_alert_card(alert, tab_prefix="resolved")
+            else:
+                st.info("No resolved alerts yet.")
+
     else:
-        st.success("✅ No active alerts. All stock levels are healthy!")
+        st.markdown("")
+        st.markdown(
+            '<div style="text-align:center;padding:60px 20px;">'
+            '<div style="font-size:3rem;margin-bottom:12px;">✅</div>'
+            '<h3 style="color:#4ade80;margin-bottom:8px;">All Clear!</h3>'
+            '<p style="color:#8888a8;">No active alerts. All stock levels are healthy.</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         st.balloons()
