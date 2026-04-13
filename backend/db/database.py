@@ -1,5 +1,5 @@
 """
-database.py - SQLAlchemy Database Configuration
+database.py - SQLAlchemy Database 
 
 Sets up the SQLite database engine, session factory, and base class
 for ORM models. Uses dependency injection pattern for FastAPI.

@@ -96,7 +96,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# ─── Helper Functions ─────────────────────────────────────────────
+# ─── Helper Functions ────────────────────────────────────────
 
 def api_get(endpoint: str):
     """Make a GET request to the backend API."""
