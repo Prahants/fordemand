@@ -53,13 +53,23 @@ def get_forecast(
         raise HTTPException(status_code=404, detail=f"Product {product_id} not found")
 
     # Run the forecast pipeline
-    result = run_forecast_pipeline(
-        db=db,
-        product_id=product_id,
-        store_id=store_id,
-        lead_time=lead_time,
-        z_score=service_level,
-    )
+    try:
+        result = run_forecast_pipeline(
+            db=db,
+            product_id=product_id,
+            store_id=store_id,
+            lead_time=lead_time,
+            z_score=service_level,
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Forecasting could not be completed. The sales data may be "
+                "insufficient or contain anomalies. Please add more sales "
+                "history and try again."
+            ),
+        )
 
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])

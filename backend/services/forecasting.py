@@ -11,6 +11,7 @@ Orchestrates the demand forecasting pipeline:
 7. Returns comprehensive forecast results
 """
 
+import math
 import pandas as pd
 import numpy as np
 from sqlalchemy.orm import Session
@@ -83,11 +84,11 @@ def run_forecast_pipeline(
     method = result["method"]
 
     # ─── Step 6: Calculate Business Metrics ───────────────────────
-    # Standard deviation of historical daily demand
-    std_dev = float(sales_data["quantity_sold"].std())
+    raw_std = sales_data["quantity_sold"].std()
+    std_dev = 0.0 if (pd.isna(raw_std) or np.isinf(raw_std)) else float(raw_std)
 
-    # Average forecasted daily demand
-    avg_forecast = float(forecasts_df["predicted_value"].mean())
+    raw_avg = forecasts_df["predicted_value"].mean()
+    avg_forecast = 0.0 if (pd.isna(raw_avg) or np.isinf(raw_avg)) else float(raw_avg)
 
     safety_stock = calculate_safety_stock(std_dev, lead_time, z_score)
 
@@ -176,7 +177,7 @@ def run_forecast_pipeline(
     db.commit()
 
     # ─── Step 10: Return Results ──────────────────────────────────
-    return {
+    return _sanitize_result({
         "product_id": product_id,
         "store_id": store_id,
         "forecasts": [
@@ -197,4 +198,23 @@ def run_forecast_pipeline(
             "id": alert.id,
             "message": alert.message,
         } if alert else None,
-    }
+    })
+
+
+def _sanitize_value(v):
+    """Replace NaN / Inf with None so the value is JSON-safe."""
+    if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+        return None
+    if isinstance(v, (np.floating,)):
+        fv = float(v)
+        return None if (math.isnan(fv) or math.isinf(fv)) else fv
+    return v
+
+
+def _sanitize_result(obj):
+    """Recursively walk a dict/list and replace NaN/Inf with None."""
+    if isinstance(obj, dict):
+        return {k: _sanitize_result(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_result(item) for item in obj]
+    return _sanitize_value(obj)
