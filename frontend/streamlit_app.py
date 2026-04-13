@@ -19,6 +19,11 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import date, timedelta
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
+import cv2
+import av
+import threading
+import time
 
 # ─── Configuration ────────────────────────────────────────────────
 API_BASE = "http://localhost:8000"
@@ -103,10 +108,59 @@ def _auth_headers() -> dict:
     return {"X-Role": role}
 
 ROLE_PAGES = {
-    "admin": ["Dashboard", "Products", "Inventory", "Sales Entry", "Forecast", "Alerts"],
-    "manager": ["Dashboard", "Products", "Inventory", "Sales Entry", "Forecast", "Alerts"],
-    "staff": ["Dashboard", "Inventory", "Sales Entry", "Forecast", "Alerts"],
+    "admin": ["Dashboard", "Products", "Inventory", "Sales Entry", "Forecast", "QR Scanner", "Alerts"],
+    "manager": ["Dashboard", "Products", "Inventory", "Sales Entry", "Forecast", "QR Scanner", "Alerts"],
+    "staff": ["Dashboard", "Inventory", "Sales Entry", "Forecast", "QR Scanner", "Alerts"],
 }
+
+
+class QRScanner(VideoProcessorBase):
+    """WebRTC video processor for live QR detection."""
+
+    def __init__(self) -> None:
+        self.detector = cv2.QRCodeDetector()
+        self.last_data = None
+        self._lock = threading.Lock()
+
+    def recv(self, frame):
+        img = frame.to_ndarray(format="bgr24")
+        data, bbox, _ = self.detector.detectAndDecode(img)
+
+        if not data:
+            decoded_multi, decoded_info, points_multi, _ = self.detector.detectAndDecodeMulti(img)
+            if decoded_multi and decoded_info:
+                data = next((val for val in decoded_info if val), None)
+                bbox = points_multi if points_multi is not None else bbox
+
+        if data:
+            with self._lock:
+                self.last_data = data
+            if bbox is not None:
+                pts = bbox.astype(int).reshape(-1, 2)
+                for i in range(len(pts)):
+                    cv2.line(
+                        img,
+                        tuple(pts[i]),
+                        tuple(pts[(i + 1) % len(pts)]),
+                        (0, 255, 0),
+                        2,
+                    )
+
+                cv2.putText(
+                    img,
+                    data,
+                    (pts[0][0], pts[0][1] - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 255, 0),
+                    2,
+                )
+
+        return av.VideoFrame.from_ndarray(img, format="bgr24")
+
+    def get_last_data(self):
+        with self._lock:
+            return self.last_data
 
 
 def api_get(endpoint: str):
@@ -610,6 +664,89 @@ elif page == "Forecast":
                 st.error(forecast_result["error"])
     else:
         st.info("No products. Seed the database first.")
+
+
+# ═══════════════════════════════════════════════════════════════════
+# PAGE: QR SCANNER
+# ═══════════════════════════════════════════════════════════════════
+elif page == "QR Scanner":
+    st.markdown("# 📷 Live Webcam QR Scanner")
+    st.markdown("Scan product QR codes and view live inventory details.")
+    st.markdown("---")
+
+    ctx = webrtc_streamer(
+        key="qr-scanner",
+        video_processor_factory=QRScanner,
+        media_stream_constraints={"video": True, "audio": False},
+        async_processing=True,
+    )
+
+    if "last_scanned_qr" not in st.session_state:
+        st.session_state.last_scanned_qr = None
+
+    if ctx.state.playing and ctx.video_processor:
+        scanned_placeholder = st.empty()
+        details_placeholder = st.empty()
+
+        # Poll decoded data from the video processor thread while the stream is active.
+        while ctx.state.playing:
+            scanned = ctx.video_processor.get_last_data()
+            if scanned:
+                scanned = scanned.strip()
+                st.session_state.last_scanned_qr = scanned
+
+            current_value = st.session_state.last_scanned_qr
+            if current_value:
+                scanned_placeholder.success(f"Scanned: {current_value}")
+            else:
+                scanned_placeholder.caption("No QR detected yet. Point your camera at a QR code.")
+
+            with details_placeholder.container():
+                if current_value and (
+                    current_value.startswith("http://")
+                    or current_value.startswith("https://")
+                ):
+                    st.markdown(f"Decoded URL: [{current_value}]({current_value})")
+
+                products = api_get("/products/") or []
+                inventory_data = api_get("/inventory/") or []
+                inventory_data = [
+                    i for i in inventory_data if i.get("store_id") == st.session_state.active_store_id
+                ]
+
+                product_by_id = {p["id"]: p for p in products}
+                sku_map = {
+                    str(p["sku"]).strip().upper(): p
+                    for p in products
+                    if p.get("sku")
+                }
+
+                matched_product = None
+                if current_value:
+                    matched_product = sku_map.get(current_value.upper())
+                    if matched_product is None and current_value.isdigit():
+                        matched_product = product_by_id.get(int(current_value))
+
+                if matched_product:
+                    inv_record = next(
+                        (
+                            row for row in inventory_data
+                            if row.get("product_id") == matched_product["id"]
+                        ),
+                        None,
+                    )
+                    if inv_record:
+                        st.write("**Product:**", matched_product["name"])
+                        st.write("**Stock:**", inv_record.get("stock", 0))
+                        st.write("**Reorder Threshold:**", inv_record.get("reorder_threshold", 0))
+                    else:
+                        st.warning("Product found, but no inventory record exists for this store.")
+                elif current_value:
+                    st.info("Scanned code did not match any product SKU or numeric product ID.")
+
+            time.sleep(0.4)
+    else:
+        st.caption("Click Start to begin live scanning.")
 
 
 # ═══════════════════════════════════════════════════════════════════
