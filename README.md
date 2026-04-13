@@ -9,7 +9,7 @@ A state-of-the-art, full-stack solution for modern supply chain management. This
 
 ---
 
-## 🌟 Project Overview
+##  Project Overview
 
 Maintaining the perfect balance of stock is a critical challenge for businesses. Too much stock ties up capital; too little leads to missed sales. The **Smart Inventory System** solves this by:
 - **Intelligent Forecasting**: Not just looking at past sales, but predicting future demand trends.
@@ -19,15 +19,15 @@ Maintaining the perfect balance of stock is a critical challenge for businesses.
 
 ---
 
-## 🔄 System Work Flow
+##  System Work Flow
 
 The following diagram illustrates the end-to-end data flow and logical processing within the system:
 
 ```mermaid
 graph TD
     A[🛒 Sales Transactions] -->|Log Sales| B[(SQLite Database)]
-    B -->|History Data| C{🧠 Prophet ML Model}
-    C -->|Forecast Next 7 Days| D[📈 Demand Forecast]
+    B -->|History Data| C{ Prophet ML Model}
+    C -->|Forecast Next 7 Days| D[Demand Forecast]
     
     D --> E[🧮 Inventory Service]
     F[⚙️ Lead Time & Service Level] --> E
@@ -35,19 +35,19 @@ graph TD
     E -->|Calculate| G[🛡️ Safety Stock]
     E -->|Calculate| H[📍 Reorder Point]
     
-    I[📦 Current Stock Levels] --> J{🚩 Alert Engine}
+    I[📦 Current Stock Levels] --> J{ Alert Engine}
     H --> J
     
     J -->|Stock < Reorder Point| K[⚠️ Active Alerts]
     
-    K --> L[📊 Streamlit Dashboard]
+    K --> L[Streamlit Dashboard]
     D --> L
     I --> L
 ```
 
 ---
 
-## 🏗️ Technical Architecture
+##  Technical Architecture
 
 | Component | Technology | Role |
 | :--- | :--- | :--- |
@@ -59,16 +59,16 @@ graph TD
 
 ---
 
-## ⚙️ Core Business Logic
+##  Core Business Logic
 
 The system automates complex supply chain mathematics to ensure high service levels:
 
-### 🛡️ Safety Stock
+###  Safety Stock
 Buffer stock to protect against demand variability.
 > **Formula:** $Safety\ Stock = Z \times \sigma_{demand} \times \sqrt{Lead\ Time}$
 > *(Where Z = 1.65 for a 95% service level)*
 
-### 📍 Reorder Point (ROP)
+###  Reorder Point (ROP)
 The exact stock level that triggers a new purchase order.
 > **Formula:** $ROP = (Average\ Daily\ Demand \times Lead\ Time) + Safety\ Stock$
 
@@ -129,5 +129,3 @@ uv run streamlit run frontend/streamlit_app.py
 
 ---
 
-## 🛡️ License & Credits
-Developed by [Prashant](https://github.com/Prahants). Distributed under the MIT License.
